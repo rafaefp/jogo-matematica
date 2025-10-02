@@ -1,0 +1,62 @@
+name: Build .NET
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Se existir um .sln use: dotnet restore NomeDaSolucao.sln
+      # Caso tenha só um .csproj, pode restaurar diretamente o .csproj ou simplesmente confiar no restore implícito do build.
+      - name: Restore
+        run: |
+          if [ -f "./jogo-matematica.sln" ]; then
+            dotnet restore ./jogo-matematica.sln
+          else
+            # Ajuste o nome do csproj se diferente
+            dotnet restore
+          fi
+
+      - name: Build
+        run: |
+            if [ -f "./jogo-matematica.sln" ]; then
+              dotnet build ./jogo-matematica.sln -c ${{ matrix.configuration }} --no-restore
+            else
+              dotnet build -c ${{ matrix.configuration }} --no-restore
+            fi
+
+      # Opcional: gerar binários "publish" prontos (por exemplo self-contained ou framework-dependent)
+      - name: Publish
+        run: |
+          OUTPUT=publish
+          if [ -f "./jogo-matematica.sln" ]; then
+            # Se quiser um RID específico (win-x64, linux-x64, etc.) acrescente: -r linux-x64 --self-contained false
+            dotnet publish ./jogo-matematica.sln -c ${{ matrix.configuration }} -o $OUTPUT --no-build
+          else
+            # Ajuste o nome do .csproj se necessário
+            PROJECT_FILE=$(find . -maxdepth 2 -name "*.csproj" | head -n1)
+            dotnet publish "$PROJECT_FILE" -c ${{ matrix.configuration }} -o $OUTPUT --no-build
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.configuration }}
+          path: publish
